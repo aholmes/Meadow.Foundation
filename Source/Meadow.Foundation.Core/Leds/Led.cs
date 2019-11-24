@@ -1,5 +1,6 @@
 using Meadow.Hardware;
 using Meadow.Peripherals.Leds;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Meadow.Foundation.Leds
@@ -22,19 +23,9 @@ namespace Meadow.Foundation.Leds
 		/// <value><c>true</c> if is on; otherwise, <c>false</c>.</value>
 		public bool IsOn
 		{
-			get { return _isOn; }
-			set
-			{
-				_isOn = value;
-				Port.State = _isOn;
-			}
+			get => Port.State;
+			set => Port.State = value;
 		}
-		#endregion
-
-		#region Fields
-		protected bool _isOn = false;
-		protected Task _animationTask = null;
-		protected bool _running = false;
 		#endregion
 
 		#region Constructor(s)
@@ -56,38 +47,36 @@ namespace Meadow.Foundation.Leds
 		}
 		#endregion
 
+		private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+
 		#region Public Methods
 		/// <summary>
 		/// Blink animation that turns the LED on and off based on the OnDuration and offDuration values in ms
 		/// </summary>
 		/// <param name="onDuration"></param>
 		/// <param name="offDuration"></param>
-		public void StartBlink(uint onDuration = 200, uint offDuration = 200)
-		{
-			_running = true;
+		public void StartBlink(uint onDuration = 200, uint offDuration = 200) => Task.Run(() => Blink(onDuration, offDuration, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
 
-            //TODO: Make this cancellable via Cancellation token
-            _animationTask = new Task(async () => 
-            {
-                while (_running)
-                {
-                    IsOn = true;
-                    await Task.Delay((int)onDuration);
-                    IsOn = false;
-                    await Task.Delay((int)offDuration);
-                }
-            });
-            _animationTask.Start();
-        }
-
-		/// <summary>
-		/// Stops the LED when its blinking and/or turns it off.
-		/// </summary>
-		public void Stop()
+		public async Task Blink(uint onDuration = 200, uint offDuration = 200, CancellationToken cancellationToken = default)
 		{
-			_running = false;
-			_isOn = false;
+			if (cancellationToken == default)
+			{
+				cancellationToken = _cancellationTokenSource.Token;
+			}
+
+			while(!cancellationToken.IsCancellationRequested)
+			{
+				IsOn = true;
+				await Task.Delay((int)onDuration);
+
+				if (cancellationToken.IsCancellationRequested) return;
+
+				IsOn = false;
+				await Task.Delay((int)offDuration);
+			}
 		}
+
+		public void Stop() => _cancellationTokenSource.Cancel();
 		#endregion
 	}
 }

@@ -32,9 +32,11 @@ namespace Meadow.UnitTests
 			var sut = new Led(port.Object);
 
 			var stateToggleTracking = new List<bool>();
+			port.SetupProperty(o => o.State);
 			port.SetupSet(o => o.State = It.IsAny<bool>())
 				.Callback<bool>(o =>
 				{
+					System.Diagnostics.Debug.WriteLine($"{sut.IsOn} == {o}");
 					stateToggleTracking.Add(sut.IsOn == o);
 				});
 
