@@ -33,19 +33,14 @@ namespace Meadow.UnitTests
 
 			var stateToggleTracking = new List<bool>();
 			port.SetupProperty(o => o.State);
-			port.SetupSet(o => o.State = It.IsAny<bool>())
-				.Callback<bool>(o =>
-				{
-					System.Diagnostics.Debug.WriteLine($"{sut.IsOn} == {o}");
-					stateToggleTracking.Add(sut.IsOn == o);
-				});
+			port.SetupSet(o => o.State = Capture.In(stateToggleTracking));
 
 			sut.StartBlink();
 			Thread.Sleep(500);
 			sut.Stop();
 
 			port.VerifySet(o => o.State = It.IsAny<bool>());
-			Assert.DoesNotContain(stateToggleTracking, o => o == false);
+			Assert.True(stateToggleTracking[0]); // if the first item is true then the port was toggled on
 		}
 
 		[Theory]
