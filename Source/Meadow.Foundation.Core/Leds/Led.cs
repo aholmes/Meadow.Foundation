@@ -10,6 +10,10 @@ namespace Meadow.Foundation.Leds
 	/// </summary>
 	public class Led : ILed
 	{
+		#region Fields
+		private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+		#endregion
+
 		#region Properties
 		/// <summary>
 		/// Gets the port that is driving the LED
@@ -47,8 +51,6 @@ namespace Meadow.Foundation.Leds
 		}
 		#endregion
 
-		private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-
 		#region Public Methods
 		/// <summary>
 		/// Blink animation that turns the LED on and off based on the OnDuration and offDuration values in ms
@@ -57,6 +59,13 @@ namespace Meadow.Foundation.Leds
 		/// <param name="offDuration"></param>
 		public void StartBlink(uint onDuration = 200, uint offDuration = 200) => Task.Run(() => Blink(onDuration, offDuration, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
 
+		/// <summary>
+		/// Blink animation that turns the LED on and off based on the OnDuration and offDuration values in ms
+		/// </summary>
+		/// <param name="onDuration"></param>
+		/// <param name="offDuration"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
 		public async Task Blink(uint onDuration = 200, uint offDuration = 200, CancellationToken cancellationToken = default)
 		{
 			if (cancellationToken == default)
@@ -76,6 +85,9 @@ namespace Meadow.Foundation.Leds
 			}
 		}
 
+		/// <summary>
+		/// Stop the blink animation
+		/// </summary>
 		public void Stop() => _cancellationTokenSource.Cancel();
 		#endregion
 	}
