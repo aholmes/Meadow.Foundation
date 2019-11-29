@@ -10,10 +10,6 @@ namespace Meadow.Foundation.Leds
 	/// </summary>
 	public class Led : ILed
 	{
-		#region Fields
-		private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-		#endregion
-
 		#region Properties
 		/// <summary>
 		/// Gets the port that is driving the LED
@@ -51,13 +47,53 @@ namespace Meadow.Foundation.Leds
 		}
 		#endregion
 
+		#region Private methods
+		private volatile CancellationTokenSource _running = new CancellationTokenSource();
+		private CancellationTokenSource Start(CancellationToken cancellationToken)
+			=> Start(cancellationToken == default
+					? new CancellationTokenSource()
+					: CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+				);
+		private CancellationTokenSource Start(CancellationTokenSource cancellationTokenSource)
+		{
+			do
+			{
+				var cts = _running;
+
+				if (Interlocked.CompareExchange(ref _running, cancellationTokenSource, cts) == cts)
+				{
+					cts.Cancel();
+					return cancellationTokenSource;
+				}
+			} while(true);
+		}
+
+		private async Task Blink(uint onDuration, uint offDuration, CancellationToken cancellationToken)
+		{
+			while(!cancellationToken.IsCancellationRequested)
+			{
+				IsOn = true;
+				await Task.Delay((int)onDuration, cancellationToken).ConfigureAwait(false);
+
+				if (cancellationToken.IsCancellationRequested) return;
+
+				IsOn = false;
+				await Task.Delay((int)offDuration, cancellationToken).ConfigureAwait(false);
+			}
+		}
+		#endregion
+
 		#region Public Methods
 		/// <summary>
 		/// Blink animation that turns the LED on and off based on the OnDuration and offDuration values in ms
 		/// </summary>
 		/// <param name="onDuration"></param>
 		/// <param name="offDuration"></param>
-		public void StartBlink(uint onDuration = 200, uint offDuration = 200) => Task.Run(() => Blink(onDuration, offDuration, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
+		public void StartBlink(uint onDuration = 200, uint offDuration = 200)
+		{
+			var cts = Start(new CancellationTokenSource());
+			Task.Run(() => Blink(onDuration, offDuration, cts.Token), cts.Token);
+		}
 
 		/// <summary>
 		/// Blink animation that turns the LED on and off based on the OnDuration and offDuration values in ms
@@ -66,29 +102,17 @@ namespace Meadow.Foundation.Leds
 		/// <param name="offDuration"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public async Task Blink(uint onDuration = 200, uint offDuration = 200, CancellationToken cancellationToken = default)
+		public Task StartBlink(uint onDuration = 200, uint offDuration = 200, CancellationToken cancellationToken = default)
 		{
-			if (cancellationToken == default)
-			{
-				cancellationToken = _cancellationTokenSource.Token;
-			}
+			cancellationToken = Start(cancellationToken).Token;
 
-			while(!cancellationToken.IsCancellationRequested)
-			{
-				IsOn = true;
-				await Task.Delay((int)onDuration);
-
-				if (cancellationToken.IsCancellationRequested) return;
-
-				IsOn = false;
-				await Task.Delay((int)offDuration);
-			}
+			return Blink(onDuration, offDuration, cancellationToken);
 		}
 
 		/// <summary>
 		/// Stop the blink animation
 		/// </summary>
-		public void Stop() => _cancellationTokenSource.Cancel();
+		public void Stop() => _running.Cancel();
 		#endregion
 	}
 }
